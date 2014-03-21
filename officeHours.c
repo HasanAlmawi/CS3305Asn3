@@ -19,6 +19,7 @@ sem_t answered;
 /*Semaphore for the office capacity*/
 sem_t office_max;
 
+
 struct Params{
 	int studentNumber;
 	int questionNumber;
@@ -43,6 +44,13 @@ int main(int argc, char **argv){
 	int officeCap = args[1];
 	//Number of questions
 	int questionNum = args[2];
+
+
+	//Checking if any of the arguments are less than 0
+	if(numStudents<1||officeCap<1||questionNum<1){
+		printf("All arguments must be greater than zero\n");
+		exit(0);
+	}
 
 	//Initializing the mutexes
 	pthread_mutex_init(&print_mutex, NULL);
@@ -110,9 +118,11 @@ void * enteroffice(void * arg){
 	struct Params *answer;
 	answer = (struct Params *) arg;
 	int sN = answer->studentNumber;
-	printf("I am student %d and I'm waiting outside the TA's door\n", sN);
-	//Students wait till the office permits for students to enter
-	sem_wait(&office_max);
+	if(sem_trywait(&office_max)){
+		printf("I am student %d and I'm waiting outside the TA's door\n", sN);
+		//Students wait till the office permits for students to enter
+		//sem_wait(&office_max);
+	}
 	//Student enters the room
 	printf("I am student %d and I am entering the room\n", sN);
 	//Student begins asking question
@@ -121,16 +131,17 @@ void * enteroffice(void * arg){
 	for(q = 0; q<qNum;q++){
 		//Put student into mutex
 		pthread_mutex_lock(&qa_mutex);
-
 		//Print the question
+		pthread_mutex_lock(&print_mutex);
 		int printnum = q +1;
    		printf("I am student %d asking question %d\n", sN, printnum);
+    	pthread_mutex_unlock(&qa_mutex);
 		sem_post(&answered);
 		//Student waits on a question to be answered
     	//Post the Q asked semaphore for other students to ask questions
     	sem_wait(&q_asked);
     	//Get out of mutex
-    	pthread_mutex_unlock(&qa_mutex);
+    	pthread_mutex_unlock(&print_mutex);	
 	}
 	//Print that the student is leaving
 	printf("I am student %d and I am leaving the room\n", sN);
